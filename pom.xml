@@ -10,7 +10,7 @@
 
     <properties>
         <elasticsearch.client.version>5.6.16</elasticsearch.client.version>
-
+        <commons-lang3.version>3.9</commons-lang3.version>
     </properties>
 
 
@@ -20,8 +20,16 @@
             <artifactId>elasticsearch-rest-client</artifactId>
             <version>${elasticsearch.client.version}</version>
         </dependency>
-
-
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.62</version>
+        </dependency>
     </dependencies>
 
     <build>
