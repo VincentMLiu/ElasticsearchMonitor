@@ -24,7 +24,7 @@ public class IndicesCheck {
 
     private static RestClient restClient = RestClient.builder(
             new HttpHost("localhost", 19201, "http"))
-            .setMaxRetryTimeoutMillis(10000)
+            .setMaxRetryTimeoutMillis(1000000)
             .build();
 
     private static int dataNodeNum = 0;
@@ -35,7 +35,7 @@ public class IndicesCheck {
     public static void main(String[] args) throws IOException {
 
 
-        File newFile = new File("D:\\Desktop\\es集群信息.csv");
+        File newFile = new File("C:\\Users\\ThinkPad\\Desktop\\es集群信息.csv");
         OutputStream os = new FileOutputStream(newFile);
         StringBuffer sb = new StringBuffer();
 
@@ -46,9 +46,18 @@ public class IndicesCheck {
 
         Pattern storeSizePattern = Pattern.compile("(([1-9]\\d*\\.?\\d+)|(0\\.\\d*[1-9])|(\\d+))(mb|kb|b)");
 
-        Pattern dailyIndexPattern = Pattern.compile("\\w+((((19|20)\\d{2})_(0?[13-9]|1[012])_(0?[1-9]|[12]\\d|30))|(((19|20)\\d{2})_(0?[13578]|1[02])_31)|(((19|20)\\d{2})_0?2_(0?[1-9]|1\\d|2[0-8]))|((((19|20)([13579][26]|[2468][048]|0[48]))|(2000))_0?2_29))\\w+");
+        Pattern dailyIndexPattern = Pattern.compile("\\w+((((19|20)\\d{2})_(0?[13-9]|1[012])_(0?[1-9]|[12]\\d|30))|" +
+                "(((19|20)\\d{2})_(0?[13578]|1[02])_31)|" +
+                "(((19|20)\\d{2})_0?2_(0?[1-9]|1\\d|2[0-8]))|" +
+                "((((19|20)([13579][26]|[2468][048]|0[48]))|(2000))_0?2_29)|" +
+                "(((19|20)\\d{2})(0?[13578]|1[02])31)|" +
+                "(((19|20)\\d{2})0?2(0?[1-9]|1\\d|2[0-8]))|" +
+                "((((19|20)([13579][26]|[2468][048]|0[48]))|(2000))0?229)|" +
+                ")\\w+");
 
         dataNodeNum = ClusterInfoUtils.countDataNodesNum(restClient);
+
+        int dealing = 1;
 
         for(String indexInfo: indicesInfoList){
 //
@@ -64,7 +73,7 @@ public class IndicesCheck {
                 int docsCount = Integer.parseInt(indexInfoSpli[6]);
                 int docsDeleted = Integer.parseInt(indexInfoSpli[7]);
                 String storeSize = indexInfoSpli[8];
-                System.out.println(indexName);
+                System.out.println((dealing++) + ":" + indexName);
 
                 if(indexName.equals(".kibana")){
                     continue;
@@ -134,9 +143,14 @@ public class IndicesCheck {
                             for(String fieldName : properties.keySet()){
                                 JSONObject field = properties.getJSONObject(fieldName);
                                 try{
-                                    if(field.getString("type").equals("text")){
-                                        if(field.containsKey("fielddata") && field.getBoolean("fielddata")){
+                                    if(field.getString("type")!=null){
+                                        if(field.getString("type").equals("text") && field.containsKey("fielddata") && field.getBoolean("fielddata")){
                                             fieldReq += " [" + fieldName + "] fielddata:true |";
+                                        }
+
+                                        //c. 5.0版本之前的`string`类型需替换为`text`或者`keyword`类型。
+                                        if(field.getString("type").equalsIgnoreCase("string")){
+                                            strFieldReq = "包含'string'废弃字段类型";
                                         }
 
                                     }
@@ -146,10 +160,7 @@ public class IndicesCheck {
                                     continue;
                                 }
 
-                //c. 5.0版本之前的`string`类型需替换为`text`或者`keyword`类型。
-                                if(field.getString("type").equalsIgnoreCase("string")){
-                                    strFieldReq = "包含'string'废弃字段类型";
-                                }
+
 
                             }
                 //b. `_all` 使用要求：无搜索全文的需求，必须禁用`_all`字段。
