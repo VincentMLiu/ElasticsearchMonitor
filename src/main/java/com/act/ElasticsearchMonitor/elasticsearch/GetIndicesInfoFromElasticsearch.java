@@ -19,7 +19,7 @@ public class GetIndicesInfoFromElasticsearch {
 
 
         RestClient restClient = RestClient.builder(
-                new HttpHost("localhost", 19200, "http"))
+                new HttpHost("localhost", 19201, "http"))
                 .setMaxRetryTimeoutMillis(10000)
                 .build();
 
