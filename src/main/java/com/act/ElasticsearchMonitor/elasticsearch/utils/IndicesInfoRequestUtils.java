@@ -73,6 +73,9 @@ public class IndicesInfoRequestUtils {
             JSONObject job = JSON.parseObject(sb.toString());
 
             for(Map.Entry<String, Object> entry : job.entrySet()){
+                if(entry.getKey().equals("alltemplate")){
+                    continue;
+                }
                 JSONObject templateJson = JSON.parseObject(entry.getValue().toString());
                 String templateStr = templateJson.getString("template");
                 String newTempL = templateStr.replaceAll("\\*","\\\\w+");
@@ -117,5 +120,33 @@ public class IndicesInfoRequestUtils {
 
     }
 
+
+    public static JSONObject deleteIndex(RestClient restClient, String indexName){
+
+        StringBuffer sb = new StringBuffer();
+        JSONObject job;
+        try {
+            Map<String, String> params = Collections.singletonMap("pretty", "true");
+            Response responseTemplate = restClient.performRequest("DELETE", indexName + "?", params);
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(responseTemplate.getEntity().getContent()));
+
+            sb = new StringBuffer();
+
+            String data;
+            while ((data = br.readLine()) != null) {
+                sb.append(data);
+            }
+            job = JSON.parseObject(sb.toString());
+
+            return job;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return job = JSON.parseObject(sb.toString());
+        }
+
+
+
+    }
 
 }

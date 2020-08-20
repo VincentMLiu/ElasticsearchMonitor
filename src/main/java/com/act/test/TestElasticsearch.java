@@ -59,6 +59,8 @@ public class TestElasticsearch {
             IndexResponse indexResponse = restHighLevelClient.index(request);
             System.out.println(indexResponse.toString());
 
+//            restHighLevelClient.delete(request);
+
 //            String index = indexResponse.getIndex();
 //            String type = indexResponse.getType();
 //            String id = indexResponse.getId();

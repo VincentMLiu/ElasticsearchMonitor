@@ -1,0 +1,32 @@
+readonlyrest:
+    access_control_rules:
+    - name: "Require HTTP Basic Auth"
+      type: allow
+      auth_key: admin:admin
+
+    - name: Accept requests from users in group team1 on index1
+      groups: ["team1"]
+      indices: ["index*"]
+    - name: Accept requests from users in group team2 on index2
+      groups: ["team2"]
+      indices: ["index2"]
+    - name: Accept requests from users in group team3 on index3
+      groups: ["team4"]
+      indices: ["index4"]    
+
+    
+    users:
+    - username: test
+      auth_key_unix: test:$6$rounds=65535$d07dnv4N$QeErsDT9Mz.ZoEPXW3dwQGL7tzwRz.eOrTBepIwfGEwdUAYSy/NirGoOaNyPx8lqiR6DYRSsDzVvVbhP4Y9wf0 #test:test
+      groups: ["team1"]
+
+    - username: test2
+      auth_key: test2:s3cr37
+      groups: ["team2"]
+
+    - username: test3
+      auth_key: test3:testtest3
+      groups: ["team4"]
+
+
+

@@ -55,6 +55,7 @@ public class IndicesCheck {
                 "((((19|20)([13579][26]|[2468][048]|0[48]))|(2000))0?229)|" +
                 ")\\w+");
 
+
         dataNodeNum = ClusterInfoUtils.countDataNodesNum(restClient);
 
         int dealing = 1;

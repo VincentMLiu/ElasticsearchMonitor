@@ -14,16 +14,17 @@ public class ConfigerationUtils {
 
 	
 	public static void init (String fileName){
+		InputStream resourceAsStream;
 		try {
 			Properties pro = new Properties();
 			BufferedReader  bf;
 			if (isWindows()){
-				InputStream resourceAsStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(fileName);
+				resourceAsStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(fileName);
 				bf = new BufferedReader(new InputStreamReader(resourceAsStream, "utf-8"));
-				resourceAsStream.close();
+
 			}else{
 				File propertiesFile = new File(JarToolUtil.getJarDir() + File.separator + "conf" + File.separator + fileName);
-				InputStream resourceAsStream = new FileInputStream(propertiesFile);
+				resourceAsStream = new FileInputStream(propertiesFile);
 				bf = new BufferedReader(new InputStreamReader(resourceAsStream, "utf-8"));
 			}
 
@@ -35,14 +36,15 @@ public class ConfigerationUtils {
 				//System.out.println(key+":"+pro.getProperty(key));
 				}
 
-			
+			resourceAsStream.close();
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} 
+		} finally {
+		}
 	}
 	
 	public static String get(String name, String defaultValue) {
