@@ -67,7 +67,7 @@ public class Csv2Xlsx {
 
     public static void convert(File inputFile) throws Exception {
         String sourceFile = inputFile.getAbsolutePath();
-        String outFile = sourceFile.subSequence(0, sourceFile.lastIndexOf(".")) + ".xlsx";
+        String outFile = sourceFile.subSequence(0, sourceFile.lastIndexOf(".")) + "";
         ConvertCsvToXlsx(sourceFile, outFile, DEFAULT_CHARSET);
     }
 

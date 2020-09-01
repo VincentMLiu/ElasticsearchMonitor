@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class IndicesAnalyse {
+public class IndicesAnalyseDataStatistic {
 
 
     private static SimpleDateFormat yyyyMMdd = new SimpleDateFormat("yyyy-MM-dd");

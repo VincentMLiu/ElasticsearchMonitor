@@ -47,6 +47,24 @@ public class IndicesInfoRequestUtils {
     }
 
 
+    public static List<String> getIndicesListInRed(RestClient restClient){
+        List<String> indicesList = new ArrayList<String>();
+        try {
+            Response responseIdc = restClient.performRequest("GET", "_cat/indices?v&health=red");
+            InputStreamReader isr = new InputStreamReader(responseIdc.getEntity().getContent());
+            BufferedReader bisr = new BufferedReader(isr);
+            String lineStr = bisr.readLine();
+            while ( (lineStr =  bisr.readLine()) !=null){
+                String newStr = lineStr.replaceAll("\\s+", ",");
+                indicesList.add(newStr);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return indicesList;
+    }
+
+
     /*
      * 获取所有的模板
      * @param restClient
@@ -148,5 +166,26 @@ public class IndicesInfoRequestUtils {
 
 
     }
+
+    public static List<String> getShardInfo(RestClient restClient, String indexName){
+        List<String> shardsList = new ArrayList<String>();
+        try {
+            Response responseIdc = restClient.performRequest("GET", "_cat/shards/" + indexName +"?v");
+            InputStreamReader isr = new InputStreamReader(responseIdc.getEntity().getContent());
+            BufferedReader bisr = new BufferedReader(isr);
+            String lineStr = bisr.readLine();
+            while ( (lineStr =  bisr.readLine()) !=null){
+                String newStr = lineStr.replaceAll("\\s+", ",");
+                shardsList.add(newStr);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return shardsList;
+    }
+
+
+
+
 
 }
