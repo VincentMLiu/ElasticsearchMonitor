@@ -119,13 +119,13 @@ public class IndicesAnalyse {
                 if(gbSizeMatcher.matches()){ //末尾为gb
                     String gbNumStr = storeSize.substring(0,storeSize.lastIndexOf("gb"));
                     double gbNum = Double.parseDouble(gbNumStr);
-                    if(gbNum < 5){//数据量小于5G的索引，主分片数量配置为3.
-                        if(priNum >=3){
-                            shardsReq += "数据量小于5G的索引，主分片数量应配置小于等于3.";
-                        }
-                    }else if (5 < gbNum ||  gbNum <= 50){//数据量(n)大于5G小于等于50G，主分片数量配置为6.
-                        if(priNum > 6){
+                    if(gbNum <= 5){//数据量小于5G的索引，主分片数量配置为3.
+                        if(priNum >=6){
                             shardsReq += "数据量小于5G的索引，主分片数量应配置小于等于6.";
+                        }
+                    }else if (5 < gbNum &&  gbNum <= 50){//数据量(n)大于5G小于等于50G，主分片数量配置为6.
+                        if(priNum > 6){
+                            shardsReq += "数据量大于5G的索引，小于50G时，主分片数量应配置小于等于6.";
                         }
                     }else{//数据量(n) 大于50G时，需满足：         a主分片数(shard×(1+副))    >= 集群数据节点数（data node） b每个分片数据量 （n/shard）小于30G c 主分片数量(shard)>6
                         shoudPartitionSize = (int)(gbNum/30) + 1 ;
@@ -150,8 +150,8 @@ public class IndicesAnalyse {
                     }
 
                 }else{ //末尾为b,kb,mb,的均小于5Gb,不会有pb的索引
-                    if(priNum >=3){
-                        shardsReq += "数据量小于5G的索引，主分片数量应配置小于等于3.";
+                    if(priNum >=6){
+                        shardsReq += "数据量小于5G的索引，主分片数量应配置小于等于6.";
                     }
                 }
 
