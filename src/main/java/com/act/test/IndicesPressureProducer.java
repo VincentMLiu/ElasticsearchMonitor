@@ -8,7 +8,10 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.nio.entity.NStringEntity;
+import org.elasticsearch.action.ActionListener;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Response;
+import org.elasticsearch.client.ResponseListener;
 import org.elasticsearch.client.RestClient;
 
 import java.io.BufferedReader;
@@ -52,11 +55,12 @@ public class IndicesPressureProducer extends Thread {
         //ES连接信息
         ConfigerationUtils.init("esPressureTest.properties");
         String esHosts = ConfigerationUtils.get("esHosts", "localhost:19200");
+        String requestMode = ConfigerationUtils.get("requestMode", "sync");
 //        int esPort = Integer.parseInt(ConfigerationUtils.get("esPort", "19200"));
         String[] esHostsSpli = esHosts.split(",");
 
         String indexName = ConfigerationUtils.get("indexName", "dns_" + yyyyMMdd.format(new Date()) + "_activeip");
-        String typeName = ConfigerationUtils.get("typeName", "ACTIVEIP");
+        String typeName = ConfigerationUtils.get("typeName", "activeip");
 
 
         HttpHost[] HttpHostArray = new HttpHost[esHostsSpli.length];
@@ -154,7 +158,27 @@ public class IndicesPressureProducer extends Thread {
 
             Response response = null;
             try {
-                response = restClient.performRequest("POST", "/_bulk", param, entity);
+
+                if(requestMode.equalsIgnoreCase("sync")){
+                    response = restClient.performRequest("POST", "/_bulk", param, entity);
+                }else if(requestMode.equalsIgnoreCase("async")){
+
+                    ResponseListener responseListener = new ResponseListener() {
+                        @Override
+                        public void onSuccess(Response response) {
+                            // 定义请求成功执行时需要做的事情
+                        }
+                        @Override
+                        public void onFailure(Exception exception) {
+                            // 定义请求失败时需要做的事情，即每当发生连接错误或返回错误状态码时做的操作。
+                        }
+                    };
+                    restClient.performRequestAsync("POST", "/_bulk", param, entity,responseListener);
+                }
+
+
+
+//                response = restClient.performRequest("POST", "/_bulk", param, entity);
 //                BufferedReader br = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
 //
 //                StringBuffer sb = new StringBuffer();
