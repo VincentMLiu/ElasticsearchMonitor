@@ -1,4 +1,4 @@
-package com.act.test;
+package com.act.test.indicesPressureTest;
 
 import com.act.ElasticsearchMonitor.elasticsearch.utils.ConfigerationUtils;
 import com.alibaba.fastjson.JSONObject;
@@ -14,103 +14,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.CountDownLatch;
 
-public class FutureTest {
-
-    //获取系统核数
-    static final int nThreads = Runtime.getRuntime().availableProcessors();
-
-    public static void main(String[] args) {
+public class IndicesPressureAPPTask implements Callable<TaskResultBean> {
 
 
-        int n = nThreads; //默认线程为核数
-        int bn = 2;
-        int bs = 10;
-        String number = nThreads + "";
-        String batchNo = "2";
-        String batchSize = "10";
-
-
-
-        if(args.length == 2){
-            batchNo = args[0]; //每个线程入多少批次
-            batchSize = args[1];//每个线程每批入多少条
-        }else if(args.length == 3){
-            number = args[0]; ///总共多少个线程
-            batchNo = args[1]; //每个线程入多少批次
-            batchSize = args[2];//每个线程每批入多少条
-        }else{
-            System.err.println("参数个数必须为2或3");
-            System.err.println("参数个数为2：batchNo  batchSize， 线程数为系统核数");
-            System.err.println("参数个数为3：number batchNo  batchSize");
-            System.exit(-1);
-        }
-
-        //总共多少个线程
-        if(number!=null && !"".equals(number)){
-            n = new Integer(number);
-        }
-
-        //每个线程入多少批次
-        if(batchNo!=null && !"".equals(batchNo)){
-            bn = new Integer(batchNo);
-        }
-
-        //每个线程每批入多少条
-        if(batchSize!=null && !"".equals(batchSize)){
-            bs = new Integer(batchSize);
-        }
-
-
-
-        Long start = System.currentTimeMillis();
-        //开启多线程
-        ExecutorService exs = Executors.newFixedThreadPool(n);
-        try {
-            //结果集
-            List<Double> list = new ArrayList<>();
-            List<Future<Double>> futureList = new ArrayList<>();
-
-            //1.高速提交10个任务，每个任务返回一个Future入list
-            for (int i = 0; i < n; i++) {
-                futureList.add(exs.submit(new IndicesPressureTask(bn,bs)));
-            }
-            Long getResultStart = System.currentTimeMillis();
-            System.out.println("结果归集开始时间=" + new Date());
-            //2.结果归集，用迭代器遍历futureList,高速轮询（模拟实现了并发），任务完成就移除
-            while(futureList.size()>0){
-                Iterator<Future<Double>> iterable = futureList.iterator();
-                //遍历一遍
-                while(iterable.hasNext()){
-                    Future<Double> future = iterable.next();
-                    //如果任务完成取结果，否则判断下一个任务是否完成
-                    if (future.isDone() && !future.isCancelled()){
-                        //获取结果
-                        Double i = future.get();
-                        System.out.println("任务i=" + i + "获取完成，移出任务队列！" + new Date());
-                        list.add(i);
-                        //任务完成移除任务
-                        iterable.remove();
-                    }else{
-                        Thread.sleep(1);//避免CPU高速运转，这里休息1毫秒，CPU纳秒级别
-                    }
-                }
-            }
-            System.out.println("list=" + list);
-            System.out.println("总耗时=" + (System.currentTimeMillis() - start) + ",取结果归集耗时=" + (System.currentTimeMillis() - getResultStart));
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            exs.shutdown();
-        }
-    }
-
-    static class IndicesPressureTask implements Callable<Double> {
         int batchNo = 2;
         int batchSize = 10;
 
@@ -121,17 +34,24 @@ public class FutureTest {
 
         private static RestClient restClient;
 
-        public IndicesPressureTask(int batchNo, int batchSize) {
+        private TaskResultBean taskResultBean;
+
+        CountDownLatch latch;
+
+        public IndicesPressureAPPTask(CountDownLatch latch, int batchNo, int batchSize) {
             super();
+            this.latch = latch;
             this.batchNo = batchNo;
             this.batchSize = batchSize;
+            taskResultBean = new TaskResultBean(Thread.currentThread().getName());
         }
 
         @Override
-        public Double call() throws Exception {
+        public TaskResultBean call() throws Exception {
 
-
+            //任务开始时间
             System.out.println("START TIME:" + yyyyMMddHHmmss.format(new Date()));
+            long pressureSendSTARTTime = System.currentTimeMillis();//任务开始时间
             //ES连接信息
             ConfigerationUtils.init("esPressureTest.properties");
             String esHosts = ConfigerationUtils.get("esHosts", "localhost:19200");
@@ -139,8 +59,8 @@ public class FutureTest {
 //        int esPort = Integer.parseInt(ConfigerationUtils.get("esPort", "19200"));
             String[] esHostsSpli = esHosts.split(",");
 
-            String indexName = ConfigerationUtils.get("indexName", "dns_" + yyyyMMdd.format(new Date()) + "_activeip");
-            String typeName = ConfigerationUtils.get("typeName", "activeip");
+            String indexName = ConfigerationUtils.get("indexName", "app_mixed" + yyyyMMdd.format(new Date()) + "_pressureTest");
+            String typeName = ConfigerationUtils.get("typeName", "versionInfo");
 
 
             HttpHost[] HttpHostArray = new HttpHost[esHostsSpli.length];
@@ -171,16 +91,29 @@ public class FutureTest {
             long index = 1l;//总处理数
             int batchIndex = 0;//批次游标
 
+            StringBuffer sbi = new StringBuffer();
+            int bigLength = 2*1024*1024 * 2; //2mb
+            while(sbi.length() * 2 < bigLength ){
+                sbi.append(batchIndex + rd.nextInt());
+            }
+
+
+            String introStr =sbi.toString();
 
             long totalBytes = 0;
 
+            long esDealingTotalTime = 0l;
+
             while( batchIndex < batchNo){
 
+                long batchSendSTARTTime = System.currentTimeMillis();//任务开始时间
                 StringBuffer jb = new StringBuffer();
                 int perBatchIndex = 0;
 
                 String timeString = yyyyMMddHHmmss.format(new Date());
                 String dateStr = yyyy_MM_dd.format(new Date());
+
+
 
                 while( perBatchIndex < batchSize ){
                     //{ "index" : { "_index" : "test", "_type" : "type1", "_id" : "1" } }
@@ -196,23 +129,23 @@ public class FutureTest {
                     jb.append(outObj.toJSONString() + "\n");
                     //{ "field1" : "value1" }
                     JSONObject fieldRequest = new JSONObject();
-                    fieldRequest.put("lastTime", timeString);
-                    fieldRequest.put("dateTime", dateStr);
-                    fieldRequest.put("houseId", index);
-                    fieldRequest.put("ip", "p14.29.48." + index);
-                    fieldRequest.put("idcIspName", "中国电信股份有限公司广东分公司-" + index);
-                    fieldRequest.put("firstTime", timeString);
-                    fieldRequest.put("visitsCount", index);
-                    fieldRequest.put("houseName", "佛山本地IDC中心-" + index);
-                    fieldRequest.put("isInIpSeg", 0);
-                    fieldRequest.put("protocol", 0);
-                    fieldRequest.put("isSpecial", 0);
-                    fieldRequest.put("port", index);
-                    fieldRequest.put("idcId", "A2.B1.B2-20090001-" + index);
-                    fieldRequest.put("createTime", timeString);
-                    fieldRequest.put("lastDay", index);
-                    fieldRequest.put("block", 0);
-                    fieldRequest.put("key", "612100920623439995" + index);
+                    fieldRequest.put("addressIp", timeString);
+                    fieldRequest.put("addressIpCity", dateStr);
+                    fieldRequest.put("addressIpProvince", index);
+                    fieldRequest.put("aggrievedType", "p14.29.48." + index);
+                    fieldRequest.put("analysisCheckStatus", 0);
+                    fieldRequest.put("appMarketId", timeString);
+                    fieldRequest.put("appName", "测试APPPPPPPPPP测试");
+                    fieldRequest.put("appVersion", "A2.B1.B2-20090001-");
+                    fieldRequest.put("author", "测试");
+                    fieldRequest.put("authorCity", "测试");
+                    fieldRequest.put("authorProvince", "测试");
+                    fieldRequest.put("behavior", "测试");
+                    fieldRequest.put("bugInfo", "测试");
+                    fieldRequest.put("bugReport", "测试");
+                    fieldRequest.put("intro", introStr);
+
+
 
                     jb.append(fieldRequest.toJSONString() + "\n");
                     perBatchIndex++;
@@ -240,6 +173,9 @@ public class FutureTest {
                 try {
 
                     if(requestMode.equalsIgnoreCase("sync")){
+
+
+
                         response = restClient.performRequest("POST", "/_bulk", param, entity);
 
                         BufferedReader br = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
@@ -252,11 +188,15 @@ public class FutureTest {
                         }
 
                         JSONObject syncResult = JSONObject.parseObject(sb.toString());
-                        syncResult.get("took");//入库时间，毫秒数
+                        long esDealingTime = Long.parseLong(syncResult.get("took").toString());//入库时间，毫秒数
+                        esDealingTotalTime += esDealingTime;
                         syncResult.get("errors");//是否有报错
                         syncResult.getJSONArray("items"); //每条请求的返回resultlist
 
-                        System.out.println(syncResult.toJSONString());
+//                        System.out.println(syncResult.toJSONString());
+
+
+                        latch.countDown();
                     }else if(requestMode.equalsIgnoreCase("async")){
 
                         ResponseListener responseListener = new ResponseListener() {
@@ -273,13 +213,16 @@ public class FutureTest {
                                         sb.append(data);
                                     }
                                     JSONObject syncResult = JSONObject.parseObject(sb.toString());
-                                    syncResult.get("took");//入库时间，毫秒数
+                                    long esDealingTime = Long.parseLong(syncResult.get("took").toString());//入库时间，毫秒数
+                                    System.out.println("[NOW] - " + Thread.currentThread().getName() + " esDealingTime: " + esDealingTime);
                                     syncResult.get("errors");//是否有报错
                                     syncResult.getJSONArray("items"); //每条请求的返回resultlist
 
-                                    System.out.println(syncResult.toJSONString());
+//                                    System.out.println(syncResult.toJSONString());
+                                    latch.countDown();
                                 } catch (IOException e) {
                                     e.printStackTrace();
+                                    latch.countDown();
                                 }
 
 
@@ -287,9 +230,13 @@ public class FutureTest {
                             @Override
                             public void onFailure(Exception exception) {
                                 // 定义请求失败时需要做的事情，即每当发生连接错误或返回错误状态码时做的操作。
+                                exception.printStackTrace();
+
+                                latch.countDown();
                             }
                         };
                         restClient.performRequestAsync("POST", "/_bulk", param, entity,responseListener);
+
                     }
 
 
@@ -301,20 +248,36 @@ public class FutureTest {
                 batchIndex++;
 
 
+                long batchSendENDTime = System.currentTimeMillis();//每批结束时间
+                long batchSendTime = batchSendENDTime - batchSendSTARTTime;
                 System.out.println("[NOW] - " + Thread.currentThread().getName() + " : " + (index -1));
+                System.out.println("[NOW] - " + Thread.currentThread().getName() + " batchSendTime: " + batchSendTime);
 
 
             }
 
 
-            double gbResult = ((double)totalBytes)/1024.0/1024.0/1024.0;
-
+            //任务结束时间
             System.out.println("END TIME:" + yyyyMMddHHmmss.format(new Date()));
+            long pressureSendENDTime = System.currentTimeMillis();//任务结束时间
+            long pressureSendTime = pressureSendENDTime - pressureSendSTARTTime;
+            System.out.println("[FINAL] - " + Thread.currentThread().getName() + " - totalRequestTime: " + pressureSendTime);
+            taskResultBean.setSendTimeInMils(pressureSendTime);
+            //总发送量
             System.out.println("[FINAL] - " + Thread.currentThread().getName() + " : " + (index -1));
+            double gbResult = ((double)totalBytes)/1024.0/1024.0/1024.0;
             System.out.println("[FINAL] - " + Thread.currentThread().getName() + " - totalRequestSize(GB): " + gbResult);
 
-            return gbResult;
+            //结果集
+
+            taskResultBean.setSendCount(index-1);
+            taskResultBean.setEsDealingTimeInMils(esDealingTotalTime);
+            taskResultBean.setGbSize(gbResult);
+
+
+            restClient.close();
+
+            return taskResultBean;
         }
-    }
 
 }

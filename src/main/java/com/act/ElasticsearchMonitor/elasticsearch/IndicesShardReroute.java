@@ -33,11 +33,11 @@ public class IndicesShardReroute {
         public static void main(String[] args) throws IOException {
 
             //ES连接信息
-//            ConfigerationUtils.init("indicesDelete.properties");
-//            String esHost = ConfigerationUtils.get("esHost", "localhost");
-//            int esPort = Integer.parseInt(ConfigerationUtils.get("esPort", "19200"));
-            String esHost = "localhost";
-            int esPort = 19202;
+            ConfigerationUtils.init("indicesDelete.properties");
+            String esHost = ConfigerationUtils.get("esHost", "localhost");
+            int esPort = Integer.parseInt(ConfigerationUtils.get("esPort", "19200"));
+//            String esHost = "172.16.16.41";
+//            int esPort = 19200;
             restClient = RestClient.builder(
                     new HttpHost(esHost, esPort, "http"))
                     .setMaxRetryTimeoutMillis(1000000)
@@ -91,6 +91,7 @@ public class IndicesShardReroute {
             Map<String,String> param = new HashMap<>();
 
             param.put("pretty", "true");
+            param.put("timeout", "5m");
 
             HttpEntity he = new NStringEntity(
                     "{ \"commands\" :"+ commands.toJSONString() + "}", ContentType.APPLICATION_JSON
