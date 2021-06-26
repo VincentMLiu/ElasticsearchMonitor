@@ -51,7 +51,7 @@ public class IndicesAnalyse {
         OutputStream os = new FileOutputStream(newFile);
         StringBuffer sb = new StringBuffer();
 
-        String headLine = "索引名称,健康状态,索引uuid,主分片数,副本分片因子,文档数量,更新或删除过的文档数,实际存储,模板,分片配置合规性,刷新频率,是否建表超过180天,落盘配置";
+        String headLine = "索引名称,健康状态,索引uuid,主分片数,副本分片因子,文档数量,更新或删除过的文档数,数据量,模板,分片配置合规性,刷新频率,是否建表超过180天,落盘配置";
 
         sb.append(headLine + "\n");
         //获取所有索引信息
@@ -111,47 +111,72 @@ public class IndicesAnalyse {
                 //2. **分片要求：** （主分片数 ***** 副本份数（`replica factor`）**=** 总分片数 **<=** 集群数据节点（`data node`）总量。数据量少的索引（小于1G或1百万条）主分片数量不大于3，以便数据集中，减少网络传输等耗时。
                 String shardsReq = "";
 
-                Matcher tbSizeMatcher = storeTbSize.matcher(storeSize);
-                Matcher gbSizeMatcher = storeGbSize.matcher(storeSize);
-                Matcher smallSizeMatcher = storeSizePattern.matcher(storeSize);
+                Matcher tbSizeMatcher = storeTbSize.matcher(priStoreSize);
+                Matcher gbSizeMatcher = storeGbSize.matcher(priStoreSize);
+                Matcher smallSizeMatcher = storeSizePattern.matcher(priStoreSize);
 
                 int shoudPartitionSize = dataNodeNum;
                 if(gbSizeMatcher.matches()){ //末尾为gb
-                    String gbNumStr = storeSize.substring(0,storeSize.lastIndexOf("gb"));
+                    String gbNumStr = priStoreSize.substring(0,priStoreSize.lastIndexOf("gb"));
                     double gbNum = Double.parseDouble(gbNumStr);
                     if(gbNum <= 5){//数据量小于5G的索引，主分片数量配置为3.
-                        if(priNum >=6){
-                            shardsReq += "数据量小于5G的索引，主分片数量应配置小于等于6.";
+                        if(priNum >=3){
+                            shardsReq += "数据量小于5G，主分片数量配置为3.";
                         }
                     }else if (5 < gbNum &&  gbNum <= 50){//数据量(n)大于5G小于等于50G，主分片数量配置为6.
                         if(priNum > 6){
-                            shardsReq += "数据量大于5G的索引，小于50G时，主分片数量应配置小于等于6.";
+                            shardsReq += "数据量大于5G小于50G，主分片数量配置为6.";
                         }
                     }else{//数据量(n) 大于50G时，需满足：         a主分片数(shard×(1+副))    >= 集群数据节点数（data node） b每个分片数据量 （n/shard）小于30G c 主分片数量(shard)>6
+                        boolean matchLessPartitionNum = false;
                         shoudPartitionSize = (int)(gbNum/30) + 1 ;
-                        if(priNum <= 6 ||//c主分片数量(shard)>6
-                                priNum < shoudPartitionSize || // b每个分片数据量 （n/shard）小于30G
-                                priNum *2 < dataNodeNum // a 分片数(shard×(1+副))    >= 集群数据节点数（data node）
-                        ){
-                            shardsReq += "数据量(n) 大于50G时，需满足： a主分片数(shard×(1+副)) >= 集群数据节点数（data node）； b每个分片数据量 （n/shard）小于30G； c 主分片数量(shard)>6。";
+                        if(priNum *(1+repFactor) < dataNodeNum){ // a 分片数(shard×(1+副))    >= 集群数据节点数（data node）
+                            shardsReq += "a. 总分片数=(主分片×(1+副因子))    >= 集群数据节点数（data node）    ";
+                            matchLessPartitionNum = true;
+                        }
+                        if(priNum < shoudPartitionSize ){// b每个分片数据量 （n/shard）小于30G
+                            shardsReq += "b.每个分片数据量 （n/shard）小于30G  ";
+                            matchLessPartitionNum = true;
+                        }
+                        if(priNum <= 6 ){//c主分片数量(shard)>6
+                            shardsReq += "c.主分片数量(shard)>6  ";
+                            matchLessPartitionNum = true;
+                        }
+                        if(matchLessPartitionNum){
+                            shardsReq = "数据量大于50G，" + shardsReq;
                         }
 
                     }
 
                 }else if(tbSizeMatcher.matches()){//末尾为tb,均>5gb
-                    String tbNumStr = storeSize.substring(0,storeSize.lastIndexOf("tb"));
+                    String tbNumStr = priStoreSize.substring(0,priStoreSize.lastIndexOf("tb"));
                     double tbNum = Double.parseDouble(tbNumStr);
+                    boolean matchLessPartitionNum = false;
+
                     shoudPartitionSize = (int)(tbNum/0.03) + 1;
-                    if(priNum <= 6 ||//c主分片数量(shard)>6
-                            priNum < shoudPartitionSize || // b每个分片数据量 （n/shard）小于30G
-                            priNum *2 < dataNodeNum // a 分片数(shard×(1+副))    >= 集群数据节点数（data node）
-                    ){
-                        shardsReq += "数据量(n) 大于50G时，需满足： a主分片数(shard×(1+副)) >= 集群数据节点数（data node）； b每个分片数据量 （n/shard）小于30G； c 主分片数量(shard)>6。";
+                    if(priNum *(1+repFactor) < dataNodeNum){ // a 分片数(shard×(1+副))    >= 集群数据节点数（data node）
+
+                        shardsReq += "a. 总分片数=(主分片×(1+副因子))    >= 集群数据节点数（data node）    ";
+                        matchLessPartitionNum = true;
+
+                    }
+                    if(priNum < shoudPartitionSize ){// b每个分片数据量 （n/shard）小于30G
+                        shardsReq += "b.每个分片数据量 （n/shard）小于30G  ";
+                        matchLessPartitionNum = true;
+
+                    }
+                    if(priNum <= 6 ){//c主分片数量(shard)>6
+                        shardsReq += "c.主分片数量(shard)>6  ";
+                        matchLessPartitionNum = true;
+
                     }
 
+                    if(matchLessPartitionNum){
+                        shardsReq = "数据量大于50G，" + shardsReq;
+                    }
                 }else{ //末尾为b,kb,mb,的均小于5Gb,不会有pb的索引
                     if(priNum >=6){
-                        shardsReq += "数据量小于5G的索引，主分片数量应配置小于等于6.";
+                        shardsReq += "数据量小于5G，主分片数量配置为3.";
                     }
                 }
 
@@ -245,7 +270,7 @@ public class IndicesAnalyse {
                         + repFactor + "," //副本分片因子
                         + docsCount + "," //文档数量
                         + docsDeleted + "," //更新或删除过的文档数
-                        + storeSize + "," //实际存储
+                        + priStoreSize + "," //实际存储
                         + template + "," //模板
                         + shardsReq + "," //分片配置合规性
 //                        + repReq + ","
