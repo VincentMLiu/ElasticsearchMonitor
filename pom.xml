@@ -12,7 +12,7 @@
         <elasticsearch.client.version>5.6.16</elasticsearch.client.version>
         <commons-lang3.version>3.9</commons-lang3.version>
         <opencsv.version>4.6</opencsv.version>
-        <poi.version>4.0.0</poi.version>
+        <poi.version>4.1.1</poi.version>
     </properties>
 
 
